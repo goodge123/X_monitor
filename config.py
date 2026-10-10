@@ -93,6 +93,10 @@ class RSSConfig:
     request_delay: int
     pin_message: bool
     state_file: str
+    # AI 分类（可选，不设则不分类直接推送）
+    ai_base_url: str
+    ai_api_key: str
+    ai_model: str
 
 
 def _build_feeds() -> tuple[Feed, ...]:
@@ -160,4 +164,7 @@ def load_rss_config() -> RSSConfig:
         pin_message=_get_bool("PIN_MESSAGE", False),
         state_file=os.environ.get("STATE_FILE", "latest_rss_ids.json").strip()
         or "latest_rss_ids.json",
+        ai_base_url=os.environ.get("AI_BASE_URL", "").strip(),
+        ai_api_key=os.environ.get("AI_API_KEY", "").strip(),
+        ai_model=os.environ.get("AI_MODEL", "").strip() or "Qwen/Qwen2.5-7B-Instruct",
     )

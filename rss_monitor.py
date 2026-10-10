@@ -92,10 +92,55 @@ def clean_text(raw: str) -> str:
     return html.unescape(text).strip()
 
 
+def classify_tweet(cfg: RSSConfig, text: str) -> str:
+    """用 AI 判断推文类型，返回 [项目] 或 [闲聊]。未配置 AI 则返回空字符串。"""
+    if not cfg.ai_api_key or not cfg.ai_base_url:
+        return ""
+    # 太短的纯转发/表情直接算闲聊，不浪费 API
+    if len(text.strip()) < 10:
+        return "[闲聊]"
+    try:
+        resp = requests.post(
+            cfg.ai_base_url.rstrip("/") + "/chat/completions",
+            headers={
+                "Authorization": f"Bearer {cfg.ai_api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": cfg.ai_model,
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": (
+                            "你是一个加密货币推文分类器。判断推文是「项目相关」还是「闲聊」。"
+                            "项目相关：在讨论具体代币/项目、合约地址、空投、IDO、价格走势、技术分析、项目动态。"
+                            "闲聊：日常生活、情绪抒发、无实质信息的灌水、纯表情。"
+                            "只回答「项目」或「闲聊」两个字，不要解释。"
+                        ),
+                    },
+                    {"role": "user", "content": text[:500]},
+                ],
+                "max_tokens": 10,
+                "temperature": 0,
+            },
+            timeout=30,
+        )
+        if resp.status_code == 200:
+            label = resp.json()["choices"][0]["message"]["content"].strip()
+            if "项目" in label:
+                return "[项目]"
+            return "[闲聊]"
+    except Exception as exc:  # AI 失败不阻塞推送
+        logger.warning("AI 分类失败：%s", exc)
+    return ""
+
+
 def build_message(cfg: RSSConfig, display_name: str, entry: feedparser.FeedParserDict) -> str:
     summary = clean_text(entry.get("summary") or entry.get("title", ""))
     link = entry.get("link", "")
-    parts = [f"用户 {display_name} 的最新推文：", "", f"原文：{summary}"]
+    tag = classify_tweet(cfg, summary)
+    prefix = f"{tag} " if tag else ""
+    parts = [f"{prefix}用户 {display_name} 的最新推文：", "", f"原文：{summary}"]
     if link:
         parts += ["", f"链接：{link}"]
     return "\n".join(parts)
