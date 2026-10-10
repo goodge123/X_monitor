@@ -28,7 +28,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("x_monitor")
 
-HTTP_TIMEOUT = 15  # 秒
+HTTP_TIMEOUT = 120  # 秒（自建 RSSHub 冷缓存回源可能较慢，放宽避免误判失败）
 MAX_NEW_PER_POLL = 5  # 单个 feed 每轮最多推送数，避免首次或积压时刷屏
 # 部分实例（如 xcancel）会检查请求头，仅对“RSS 客户端”返回内容，
 # 浏览器 UA 反而被拒（400: This URL only works inside an RSS client）。
