@@ -27,3 +27,4 @@ curl -s -o /dev/null --max-time 200 "http://localhost:1203/twitter/user/wenxue60
 curl -s -o /dev/null --max-time 200 "http://localhost:1204/twitter/user/ZF_lab" || true
 curl -s -o /dev/null --max-time 200 "http://localhost:1204/twitter/user/Greta0086" || true
 curl -s -o /dev/null --max-time 200 "http://localhost:1204/twitter/user/Yiyixmb" || true
+curl -s -o /dev/null --max-time 200 "http://localhost:1202/twitter/user/Arya_web3" || true
