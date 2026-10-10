@@ -148,12 +148,15 @@ def build_message(cfg: RSSConfig, display_name: str, entry: feedparser.FeedParse
 
 
 def build_label_keyboard(entry_id_str: str) -> dict:
-    """推文下方的 [项目] / [闲聊] 纠正按钮。"""
+    """推文下方的 [项目] / [闲聊] 纠正按钮。callback_data 限 64 字节，用短 hash。"""
+    import hashlib
+
+    short_id = hashlib.md5(entry_id_str.encode()).hexdigest()[:16]
     return {
         "inline_keyboard": [
             [
-                {"text": "项目", "callback_data": f"label:project:{entry_id_str[:64]}"},
-                {"text": "闲聊", "callback_data": f"label:idle:{entry_id_str[:64]}"},
+                {"text": "项目", "callback_data": f"lp:{short_id}"},
+                {"text": "闲聊", "callback_data": f"li:{short_id}"},
             ]
         ]
     }

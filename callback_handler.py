@@ -97,9 +97,16 @@ def run() -> int:
             if not cq:
                 continue
             data = cq.get("data", "")
-            if not data.startswith("label:"):
+            # 新格式 lp:<hash> / li:<hash>；兼容旧格式 label:project:xxx
+            label = None
+            entry_id = ""
+            if data.startswith("lp:") or data.startswith("li:"):
+                label = "project" if data.startswith("lp:") else "idle"
+                entry_id = data[3:]
+            elif data.startswith("label:"):
+                _, label, entry_id = data.split(":", 2)
+            if not label:
                 continue
-            _, label, entry_id = data.split(":", 2)
             user = cq.get("from", {}).get("username", "?")
             label_cn = "项目" if label == "project" else "闲聊"
             record_correction(entry_id, label, user)
