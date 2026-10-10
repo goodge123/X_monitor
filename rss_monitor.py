@@ -135,10 +135,9 @@ def classify_tweet(cfg: RSSConfig, text: str) -> str:
     return ""
 
 
-def build_message(cfg: RSSConfig, display_name: str, entry: feedparser.FeedParserDict) -> str:
+def build_message(cfg: RSSConfig, display_name: str, entry: feedparser.FeedParserDict, tag: str = "") -> str:
     summary = clean_text(entry.get("summary") or entry.get("title", ""))
     link = entry.get("link", "")
-    tag = classify_tweet(cfg, summary)
     prefix = f"{tag} " if tag else ""
     parts = [f"{prefix}用户 {display_name} 的最新推文：", "", f"原文：{summary}"]
     if link:
@@ -183,12 +182,21 @@ def poll_feed(
 
     # 从旧到新推送，并限制单轮数量
     for entry in reversed(new_entries[:MAX_NEW_PER_POLL]):
-        logger.info("新条目 %s：%s", display_name, entry_id(entry))
-        message = build_message(cfg, display_name, entry)
+        eid = entry_id(entry)
+        summary = clean_text(entry.get("summary") or entry.get("title", ""))
+        tag = classify_tweet(cfg, summary)
+        # AI 开启时只推项目相关，闲聊直接跳过（仍更新基线避免重复）
+        if tag == "[闲聊]" and cfg.ai_filter_idle:
+            logger.info("跳过闲聊 %s：%s", display_name, eid)
+            state[state_key] = eid
+            notifier.save_state(cfg.state_file, state)
+            continue
+        logger.info("新条目 %s：%s", display_name, eid)
+        message = build_message(cfg, display_name, entry, tag)
         notifier.send_to_telegram(
             cfg.telegram_bot_token, cfg.telegram_chat_id, message, cfg.pin_message
         )
-        state[state_key] = entry_id(entry)
+        state[state_key] = eid
         notifier.save_state(cfg.state_file, state)
 
     if len(new_entries) > MAX_NEW_PER_POLL:

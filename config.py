@@ -97,6 +97,8 @@ class RSSConfig:
     ai_base_url: str
     ai_api_key: str
     ai_model: str
+    # AI 开启时是否过滤闲聊（只推项目相关）
+    ai_filter_idle: bool
 
 
 def _build_feeds() -> tuple[Feed, ...]:
@@ -167,4 +169,5 @@ def load_rss_config() -> RSSConfig:
         ai_base_url=os.environ.get("AI_BASE_URL", "").strip(),
         ai_api_key=os.environ.get("AI_API_KEY", "").strip(),
         ai_model=os.environ.get("AI_MODEL", "").strip() or "Qwen/Qwen2.5-7B-Instruct",
+        ai_filter_idle=_get_bool("AI_FILTER_IDLE", True),
     )
