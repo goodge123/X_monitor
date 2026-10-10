@@ -1,0 +1,14 @@
+[Unit]
+Description=X Monitor Telegram callback handler (label correction buttons)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/x-monitor/X_monitor
+ExecStart=/root/x-monitor/X_monitor/.venv/bin/python callback_handler.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

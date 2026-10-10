@@ -145,6 +145,18 @@ def build_message(cfg: RSSConfig, display_name: str, entry: feedparser.FeedParse
     return "\n".join(parts)
 
 
+def build_label_keyboard(entry_id_str: str) -> dict:
+    """推文下方的 [项目] / [闲聊] 纠正按钮。"""
+    return {
+        "inline_keyboard": [
+            [
+                {"text": "项目", "callback_data": f"label:project:{entry_id_str[:64]}"},
+                {"text": "闲聊", "callback_data": f"label:idle:{entry_id_str[:64]}"},
+            ]
+        ]
+    }
+
+
 def poll_feed(
     cfg: RSSConfig,
     display_name: str,
@@ -193,8 +205,11 @@ def poll_feed(
             continue
         logger.info("新条目 %s：%s", display_name, eid)
         message = build_message(cfg, display_name, entry, tag)
+        # AI 分类启用时带上纠正按钮
+        keyboard = build_label_keyboard(eid) if tag else None
         notifier.send_to_telegram(
-            cfg.telegram_bot_token, cfg.telegram_chat_id, message, cfg.pin_message
+            cfg.telegram_bot_token, cfg.telegram_chat_id, message, cfg.pin_message,
+            reply_markup=keyboard,
         )
         state[state_key] = eid
         notifier.save_state(cfg.state_file, state)

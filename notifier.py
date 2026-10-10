@@ -78,27 +78,33 @@ def send_to_telegram(
     chat_id: str,
     message: str,
     pin_message: bool = False,
-) -> None:
+    reply_markup: dict | None = None,
+) -> int | None:
+    """发送消息，返回 message_id（失败返回 None）。"""
     send_url = f"{TELEGRAM_API}/bot{bot_token}/sendMessage"
     payload = {
         "chat_id": chat_id,
         "text": message,
         "disable_web_page_preview": False,
     }
+    if reply_markup:
+        payload["reply_markup"] = reply_markup
     try:
         resp = requests.post(send_url, json=payload, timeout=HTTP_TIMEOUT)
     except requests.RequestException as exc:
         logger.error("Telegram 发送错误：%s", _redact(str(exc), bot_token))
-        return
+        return None
 
     if resp.status_code != 200:
         logger.error("Telegram 发送失败 %s：%s", resp.status_code, resp.text[:300])
-        return
+        return None
 
-    if pin_message:
-        message_id = resp.json().get("result", {}).get("message_id")
-        if message_id:
-            _pin_message(bot_token, chat_id, message_id)
+    message_id = resp.json().get("result", {}).get("message_id")
+
+    if pin_message and message_id:
+        _pin_message(bot_token, chat_id, message_id)
+
+    return message_id
 
 
 def _pin_message(bot_token: str, chat_id: str, message_id: int) -> None:
