@@ -100,7 +100,16 @@ def classify_tweet(cfg: RSSConfig, text: str) -> str:
     if len(text.strip()) < 10:
         return "[闲聊]"
     try:
-        proxies = {"http": cfg.ai_proxy, "https": cfg.ai_proxy} if cfg.ai_proxy else None
+        proxy_url = cfg.ai_proxy.strip()
+        # 兼容 host:port:user:pass 格式，转成 http://user:pass@host:port
+        if proxy_url and "://" not in proxy_url:
+            parts = proxy_url.split(":")
+            if len(parts) == 4:
+                h, p, u, pw = parts
+                proxy_url = f"http://{u}:{pw}@{h}:{p}"
+            elif len(parts) == 2:
+                proxy_url = f"http://{proxy_url}"
+        proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
         resp = requests.post(
             cfg.ai_base_url.rstrip("/") + "/chat/completions",
             headers={
