@@ -168,6 +168,6 @@ def load_rss_config() -> RSSConfig:
         or "latest_rss_ids.json",
         ai_base_url=os.environ.get("AI_BASE_URL", "").strip(),
         ai_api_key=os.environ.get("AI_API_KEY", "").strip(),
-        ai_model=os.environ.get("AI_MODEL", "").strip() or "Qwen/Qwen2.5-7B-Instruct",
+        ai_model=os.environ.get("AI_MODEL", "").strip() or "llama-3.1-8b-instant",
         ai_filter_idle=_get_bool("AI_FILTER_IDLE", True),
     )
