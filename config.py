@@ -99,6 +99,8 @@ class RSSConfig:
     ai_model: str
     # AI 开启时是否过滤闲聊（只推项目相关）
     ai_filter_idle: bool
+    # AI 请求的代理（可选，VPS 直连 Groq 超时时用）
+    ai_proxy: str
 
 
 def _build_feeds() -> tuple[Feed, ...]:
@@ -170,4 +172,5 @@ def load_rss_config() -> RSSConfig:
         ai_api_key=os.environ.get("AI_API_KEY", "").strip(),
         ai_model=os.environ.get("AI_MODEL", "").strip() or "qwen/qwen3.8-27b",
         ai_filter_idle=_get_bool("AI_FILTER_IDLE", False),
+        ai_proxy=os.environ.get("AI_PROXY", "").strip(),
     )

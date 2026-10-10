@@ -100,6 +100,7 @@ def classify_tweet(cfg: RSSConfig, text: str) -> str:
     if len(text.strip()) < 10:
         return "[闲聊]"
     try:
+        proxies = {"http": cfg.ai_proxy, "https": cfg.ai_proxy} if cfg.ai_proxy else None
         resp = requests.post(
             cfg.ai_base_url.rstrip("/") + "/chat/completions",
             headers={
@@ -124,6 +125,7 @@ def classify_tweet(cfg: RSSConfig, text: str) -> str:
                 "temperature": 0,
             },
             timeout=30,
+            proxies=proxies,
         )
         if resp.status_code == 200:
             label = resp.json()["choices"][0]["message"]["content"].strip()
