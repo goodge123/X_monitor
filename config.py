@@ -127,7 +127,7 @@ def _build_feeds() -> tuple[Feed, ...]:
                 name, url = item.split("|", 1)
                 name, url = name.strip(), url.strip()
             else:
-                name, url = _host_of(item), item
+                name, url = _name_of(item), item
             feeds.append((name, url, (url,)))
 
     base_url = os.environ.get("RSS_BASE_URL", "").strip()
@@ -155,6 +155,22 @@ def _host_of(url: str) -> str:
 
     host = urlparse(url).netloc
     return host or url
+
+
+def _name_of(url: str) -> str:
+    """RSS_FEEDS 条目未用 `名称|URL` 指定显示名时，从 URL 推导显示名。
+
+    RSSHub 形如 /twitter/user/<handle> 的路径直接取 @handle，
+    这样推送消息里显示的是 KOL 账号而不是 localhost:端口；
+    取不到则退回主机名（兼容旧行为）。
+    """
+    import re
+    from urllib.parse import urlparse
+
+    m = re.search(r"/twitter/user/([^/?#]+)", urlparse(url).path or "")
+    if m and m.group(1):
+        return "@" + m.group(1)
+    return _host_of(url)
 
 
 def load_rss_config() -> RSSConfig:
