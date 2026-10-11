@@ -29,3 +29,8 @@ curl -s -o /dev/null --max-time 200 "http://localhost:1204/twitter/user/Greta008
 curl -s -o /dev/null --max-time 200 "http://localhost:1204/twitter/user/Yiyixmb" || true
 curl -s -o /dev/null --max-time 200 "http://localhost:1202/twitter/user/Arya_web3" || true
 curl -s -o /dev/null --max-time 200 "http://localhost:1203/twitter/user/tehyf639715" || true
+curl -s -o /dev/null --max-time 200 "http://localhost:1203/twitter/user/yuopu6" || true
+curl -s -o /dev/null --max-time 200 "http://localhost:1204/twitter/user/runes_leo" || true
+curl -s -o /dev/null --max-time 200 "http://localhost:1203/twitter/user/Reboottttttt" || true
+curl -s -o /dev/null --max-time 200 "http://localhost:1204/twitter/user/aiqiang888" || true
+curl -s -o /dev/null --max-time 200 "http://localhost:1200/twitter/user/orbitalxyz" || true
