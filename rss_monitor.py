@@ -92,13 +92,8 @@ def clean_text(raw: str) -> str:
     return html.unescape(text).strip()
 
 
-def classify_tweet(cfg: RSSConfig, text: str) -> str:
-    """用 AI 判断推文类型，返回 [项目] 或 [闲聊]。未配置 AI 则返回空字符串。"""
-    if not cfg.ai_api_key or not cfg.ai_base_url:
-        return ""
-    # 太短的纯转发/表情直接算闲聊，不浪费 API
-    if len(text.strip()) < 10:
-        return "[闲聊]"
+def _ai_chat(cfg: RSSConfig, system: str, user: str, max_tokens: int = 10) -> str:
+    """调用 OpenAI 兼容接口，返回助手回复文本。失败返回空字符串。"""
     try:
         proxy_url = cfg.ai_proxy.strip()
         # 兼容 host:port:user:pass 格式，转成 http://user:pass@host:port
@@ -119,31 +114,62 @@ def classify_tweet(cfg: RSSConfig, text: str) -> str:
             json={
                 "model": cfg.ai_model,
                 "messages": [
-                    {
-                        "role": "system",
-                        "content": (
-                            "你是一个加密货币推文分类器。判断推文是「项目相关」还是「闲聊」。"
-                            "项目相关：在讨论具体代币/项目、合约地址、空投、IDO、价格走势、技术分析、项目动态。"
-                            "闲聊：日常生活、情绪抒发、无实质信息的灌水、纯表情。"
-                            "只回答「项目」或「闲聊」两个字，不要解释。"
-                        ),
-                    },
-                    {"role": "user", "content": text[:500]},
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user[:800]},
                 ],
-                "max_tokens": 10,
+                "max_tokens": max_tokens,
                 "temperature": 0,
             },
             timeout=30,
             proxies=proxies,
         )
         if resp.status_code == 200:
-            label = resp.json()["choices"][0]["message"]["content"].strip()
-            if "项目" in label:
-                return "[项目]"
-            return "[闲聊]"
+            return resp.json()["choices"][0]["message"]["content"].strip()
     except Exception as exc:  # AI 失败不阻塞推送
-        logger.warning("AI 分类失败：%s", exc)
+        logger.warning("AI 调用失败：%s", exc)
     return ""
+
+
+def classify_tweet(cfg: RSSConfig, text: str) -> str:
+    """用 AI 判断推文类型，返回 [项目] 或 [闲聊]。未配置 AI 则返回空字符串。"""
+    if not cfg.ai_api_key or not cfg.ai_base_url:
+        return ""
+    # 太短的纯转发/表情直接算闲聊，不浪费 API
+    if len(text.strip()) < 10:
+        return "[闲聊]"
+    label = _ai_chat(
+        cfg,
+        "你是一个加密货币推文分类器。判断推文是「项目相关」还是「闲聊」。"
+        "项目相关：在讨论具体代币/项目、合约地址、空投、IDO、价格走势、技术分析、项目动态。"
+        "闲聊：日常生活、情绪抒发、无实质信息的灌水、纯表情。"
+        "只回答「项目」或「闲聊」两个字，不要解释。",
+        text,
+    )
+    if "项目" in label:
+        return "[项目]"
+    if "闲聊" in label:
+        return "[闲聊]"
+    return ""
+
+
+def translate_tweet(cfg: RSSConfig, text: str) -> str:
+    """英文推文翻成中文。中文推文或未配置 AI 返回空字符串。"""
+    if not cfg.ai_api_key or not cfg.ai_base_url:
+        return ""
+    # 简单判断：ASCII 占比高才可能是英文，中文直接跳过
+    ascii_count = sum(1 for c in text if ord(c) < 128)
+    if len(text.strip()) < 20 or ascii_count < len(text) * 0.5:
+        return ""
+    trans = _ai_chat(
+        cfg,
+        "你是翻译助手。把用户发来的英文推文翻译成简洁的中文。"
+        "如果已经是中文或无法翻译，只回答「无」。",
+        text,
+        max_tokens=400,
+    )
+    if not trans or trans == "无":
+        return ""
+    return trans
 
 
 def build_message(cfg: RSSConfig, display_name: str, entry: feedparser.FeedParserDict, tag: str = "") -> str:
@@ -151,6 +177,10 @@ def build_message(cfg: RSSConfig, display_name: str, entry: feedparser.FeedParse
     link = entry.get("link", "")
     prefix = f"{tag} " if tag else ""
     parts = [f"{prefix}用户 {display_name} 的最新推文：", "", f"原文：{summary}"]
+    # 英文推文自动翻译
+    trans = translate_tweet(cfg, summary)
+    if trans:
+        parts += ["", f"翻译：{trans}"]
     if link:
         parts += ["", f"链接：{link}"]
     return "\n".join(parts)
