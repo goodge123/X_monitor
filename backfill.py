@@ -28,13 +28,8 @@ def main():
     cfg = load_rss_config()
     pushed = 0
     skipped_idle = 0
-    for feed_url in cfg.rss_feeds:
-        # 兼容 username|url 格式
-        if "|" in feed_url:
-            display_name, url = feed_url.split("|", 1)
-        else:
-            url = feed_url
-            display_name = url.split("/twitter/user/")[-1] if "/twitter/user/" in url else url
+    for name, url, _urls in cfg.feeds:
+        display_name = name
         try:
             resp = requests.get(url, timeout=30)
             resp.raise_for_status()
