@@ -255,6 +255,11 @@ def poll_feed(
             cfg.telegram_bot_token, cfg.telegram_chat_id, message, cfg.pin_message,
             reply_markup=keyboard,
         )
+        # QQ 双推（已配置才发；失败只记日志，不影响 TG 与基线更新）
+        if cfg.qq_onebot_token and cfg.qq_group_id:
+            notifier.send_to_qq_group(
+                cfg.qq_onebot_url, cfg.qq_onebot_token, cfg.qq_group_id, message
+            )
         state[state_key] = eid
         notifier.save_state(cfg.state_file, state)
 

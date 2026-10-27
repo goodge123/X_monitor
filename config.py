@@ -101,6 +101,10 @@ class RSSConfig:
     ai_filter_idle: bool
     # AI 请求的代理（可选，VPS 直连 Groq 超时时用）
     ai_proxy: str
+    # QQ 推送（NapCat/OneBot，可选：未配 token 或群号时整段跳过，不影响 TG）
+    qq_onebot_url: str
+    qq_onebot_token: str
+    qq_group_id: str
 
 
 def _build_feeds() -> tuple[Feed, ...]:
@@ -189,4 +193,8 @@ def load_rss_config() -> RSSConfig:
         ai_model=os.environ.get("AI_MODEL", "").strip() or "qwen/qwen3.8-27b",
         ai_filter_idle=_get_bool("AI_FILTER_IDLE", False),
         ai_proxy=os.environ.get("AI_PROXY", "").strip(),
+        qq_onebot_url=os.environ.get("QQ_ONEBOT_URL", "").strip()
+        or "http://127.0.0.1:3000",
+        qq_onebot_token=os.environ.get("QQ_ONEBOT_TOKEN", "").strip(),
+        qq_group_id=os.environ.get("QQ_GROUP_ID", "").strip(),
     )

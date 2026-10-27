@@ -107,6 +107,48 @@ def send_to_telegram(
     return message_id
 
 
+# ---------------------------------------------------------------------------
+# QQ 推送（NapCat / OneBot 11 HTTP）
+# ---------------------------------------------------------------------------
+def send_to_qq_group(
+    onebot_url: str, token: str, group_id: str, message: str
+) -> bool:
+    """通过 OneBot 接口发 QQ 群消息。成功返回 True，任何失败只记日志返回 False。"""
+    if not onebot_url or not token or not group_id:
+        return False
+    try:
+        gid: int | str = int(group_id)
+    except (TypeError, ValueError):
+        gid = str(group_id)
+    url = onebot_url.rstrip("/") + "/send_group_msg"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+    }
+    try:
+        resp = requests.post(
+            url,
+            json={"group_id": gid, "message": message},
+            headers=headers,
+            timeout=HTTP_TIMEOUT,
+        )
+    except requests.RequestException as exc:
+        logger.error("QQ 发送错误：%s", exc)
+        return False
+    if resp.status_code != 200:
+        logger.error("QQ 发送失败 %s：%s", resp.status_code, resp.text[:300])
+        return False
+    try:
+        data = resp.json()
+    except ValueError:
+        logger.error("QQ 发送响应不是 JSON：%s", resp.text[:200])
+        return False
+    if data.get("status") != "ok" or data.get("retcode") not in (0, None):
+        logger.error("QQ 发送被拒：%s", str(data)[:300])
+        return False
+    return True
+
+
 def _pin_message(bot_token: str, chat_id: str, message_id: int) -> None:
     pin_url = f"{TELEGRAM_API}/bot{bot_token}/pinChatMessage"
     payload = {"chat_id": chat_id, "message_id": message_id}
