@@ -149,6 +149,69 @@ def send_to_qq_group(
     return True
 
 
+# ---------------------------------------------------------------------------
+# QQ 官方机器人推送（开放平台 API v2）
+# ---------------------------------------------------------------------------
+_qq_official_token_cache: dict[str, object] = {"token": "", "expires_at": 0.0}
+
+
+def _qq_official_access_token(appid: str, secret: str) -> str:
+    """取官方机器人 access_token（有效期约 7200 秒，进程内缓存）。失败返回空串。"""
+    now = time.time()
+    if _qq_official_token_cache["token"] and float(_qq_official_token_cache["expires_at"]) > now + 60:
+        return str(_qq_official_token_cache["token"])
+    try:
+        resp = requests.post(
+            "https://bots.qq.com/app/getAppAccessToken",
+            json={"appId": appid, "clientSecret": secret},
+            timeout=HTTP_TIMEOUT,
+        )
+        data = resp.json()
+    except (requests.RequestException, ValueError) as exc:
+        logger.error("QQ 官方 token 获取失败：%s", exc)
+        return ""
+    token = data.get("access_token")
+    if not token:
+        logger.error("QQ 官方 token 响应异常：%s", str(data)[:200])
+        return ""
+    try:
+        expires_in = int(data.get("expires_in", 7200))
+    except (TypeError, ValueError):
+        expires_in = 7200
+    _qq_official_token_cache["token"] = token
+    _qq_official_token_cache["expires_at"] = now + expires_in
+    return token
+
+
+def send_to_qq_official(appid: str, secret: str, group_openid: str, message: str) -> bool:
+    """通过官方 API 发群主动消息。成功返回 True，任何失败只记日志返回 False。"""
+    if not appid or not secret or not group_openid:
+        return False
+    token = _qq_official_access_token(appid, secret)
+    if not token:
+        return False
+    try:
+        resp = requests.post(
+            f"https://api.sgroup.qq.com/v2/groups/{group_openid}/messages",
+            headers={
+                "Authorization": f"QQBot {token}",
+                "Content-Type": "application/json",
+            },
+            json={"content": message, "msg_type": 0},
+            timeout=HTTP_TIMEOUT,
+        )
+    except requests.RequestException as exc:
+        logger.error("QQ 官方发送错误：%s", exc)
+        return False
+    if resp.status_code != 200:
+        logger.error("QQ 官方发送失败 %s：%s", resp.status_code, resp.text[:300])
+        # token 可能被服务端提前失效，清缓存让下次重取
+        _qq_official_token_cache["token"] = ""
+        _qq_official_token_cache["expires_at"] = 0.0
+        return False
+    return True
+
+
 def _pin_message(bot_token: str, chat_id: str, message_id: int) -> None:
     pin_url = f"{TELEGRAM_API}/bot{bot_token}/pinChatMessage"
     payload = {"chat_id": chat_id, "message_id": message_id}

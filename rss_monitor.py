@@ -260,6 +260,14 @@ def poll_feed(
             notifier.send_to_qq_group(
                 cfg.qq_onebot_url, cfg.qq_onebot_token, cfg.qq_group_id, message
             )
+        # QQ 官方机器人推送（配齐才发；失败只记日志）
+        if cfg.qq_official_appid and cfg.qq_official_secret and cfg.qq_official_group_openid:
+            notifier.send_to_qq_official(
+                cfg.qq_official_appid,
+                cfg.qq_official_secret,
+                cfg.qq_official_group_openid,
+                message,
+            )
         state[state_key] = eid
         notifier.save_state(cfg.state_file, state)
 

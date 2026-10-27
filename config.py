@@ -105,6 +105,10 @@ class RSSConfig:
     qq_onebot_url: str
     qq_onebot_token: str
     qq_group_id: str
+    # QQ 官方机器人推送（可选：未配齐 AppID/Secret/群 openid 时整段跳过）
+    qq_official_appid: str
+    qq_official_secret: str
+    qq_official_group_openid: str
 
 
 def _build_feeds() -> tuple[Feed, ...]:
@@ -197,4 +201,7 @@ def load_rss_config() -> RSSConfig:
         or "http://127.0.0.1:3000",
         qq_onebot_token=os.environ.get("QQ_ONEBOT_TOKEN", "").strip(),
         qq_group_id=os.environ.get("QQ_GROUP_ID", "").strip(),
+        qq_official_appid=os.environ.get("QQ_OFFICIAL_APPID", "").strip(),
+        qq_official_secret=os.environ.get("QQ_OFFICIAL_SECRET", "").strip(),
+        qq_official_group_openid=os.environ.get("QQ_OFFICIAL_GROUP_OPENID", "").strip(),
     )
