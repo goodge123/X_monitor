@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import html
 import logging
+import re
 import signal
 import sys
 from typing import Any
@@ -152,13 +153,60 @@ def classify_tweet(cfg: RSSConfig, text: str) -> str:
     return ""
 
 
-def translate_tweet(cfg: RSSConfig, text: str) -> str:
-    """英文推文翻成中文。中文推文或未配置 AI 返回空字符串。"""
+_URL_RE = re.compile(r"https?://\S+")
+_QUOTE_BLOCK_RE = re.compile(r'<div class="rsshub-quote">.*?</div>', re.S)
+
+
+def _lang_counts(text: str) -> tuple[int, int]:
+    """统计文本（先剥 URL）的 CJK 表意字数与拉丁字母数。"""
+    plain = _URL_RE.sub(" ", text or "")
+    cjk = latin = 0
+    for ch in plain:
+        o = ord(ch)
+        if (
+            (0x4E00 <= o <= 0x9FFF)
+            or (0x3400 <= o <= 0x4DBF)
+            or (0x3040 <= o <= 0x30FF)
+            or (0xAC00 <= o <= 0xD7AF)
+        ):
+            cjk += 1
+        elif ch.isascii() and ch.isalpha():
+            latin += 1
+    return cjk, latin
+
+
+def is_chinese_dominant(text: str) -> bool:
+    """中文占主导：CJK 不少于 5 字，且 CJK / (CJK + 拉丁字母) >= 0.5。"""
+    cjk, latin = _lang_counts(text)
+    if cjk < 5:
+        return False
+    if latin == 0:
+        return True
+    return cjk / (cjk + latin) >= 0.5
+
+
+def tweet_own_text(raw: str) -> str:
+    """从条目 summary 的原始 HTML 提取推文自身文本，供语言判断：
+    去掉 RSSHub 追加的链接卡片块（rsshub-quote）、所有标签与 URL，
+    避免链接预览里的英文站描污染语言构成统计。"""
+    t = _QUOTE_BLOCK_RE.sub(" ", raw or "")
+    t = re.sub(r"<[^>]+>", " ", t)
+    t = html.unescape(t)
+    return _URL_RE.sub(" ", t).strip()
+
+
+def translate_tweet(cfg: RSSConfig, text: str, own_text: str | None = None) -> str:
+    """英文推文翻成中文。中文占主导或未配置 AI 返回空字符串（不调用翻译接口）。"""
     if not cfg.ai_api_key or not cfg.ai_base_url:
         return ""
-    # 简单判断：ASCII 占比高才可能是英文，中文直接跳过
-    ascii_count = sum(1 for c in text if ord(c) < 128)
-    if len(text.strip()) < 20 or ascii_count < len(text) * 0.5:
+    # 语言判断只看推文自身文本（已剥链接卡片块与 URL）：中文主导直接跳过
+    probe = own_text if own_text is not None else text
+    if is_chinese_dominant(probe):
+        return ""
+    if len(text.strip()) < 20:
+        return ""
+    _, latin = _lang_counts(probe)
+    if latin == 0:
         return ""
     trans = _ai_chat(
         cfg,
@@ -173,12 +221,13 @@ def translate_tweet(cfg: RSSConfig, text: str) -> str:
 
 
 def build_message(cfg: RSSConfig, display_name: str, entry: feedparser.FeedParserDict, tag: str = "") -> str:
-    summary = clean_text(entry.get("summary") or entry.get("title", ""))
+    raw_summary = entry.get("summary") or entry.get("title", "")
+    summary = clean_text(raw_summary)
     link = entry.get("link", "")
     prefix = f"{tag} " if tag else ""
     parts = [f"{prefix}用户 {display_name} 的最新推文：", "", f"原文：{summary}"]
-    # 英文推文自动翻译
-    trans = translate_tweet(cfg, summary)
+    # 英文推文自动翻译（是否翻译按推文自身文本的语言构成判断）
+    trans = translate_tweet(cfg, summary, own_text=tweet_own_text(raw_summary))
     if trans:
         parts += ["", f"翻译：{trans}"]
     if link:
