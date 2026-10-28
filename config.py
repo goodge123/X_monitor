@@ -62,6 +62,14 @@ def _parse_usernames(raw: str) -> tuple[str, ...]:
     return usernames
 
 
+def _parse_handles(raw: str) -> frozenset[str]:
+    return frozenset(
+        name.strip().lstrip("@").lower()
+        for name in raw.split(",")
+        if name.strip()
+    )
+
+
 def load_config() -> Config:
     """构建 API 轮询版所需的 Config，如有问题则抛出 ConfigError。"""
     usernames = _parse_usernames(_require("USERNAMES_TO_TRACK"))
@@ -109,6 +117,9 @@ class RSSConfig:
     qq_official_appid: str
     qq_official_secret: str
     qq_official_group_openid: str
+    # 特殊监控账号（SPECIAL_HANDLES，逗号分隔的 X 用户名）：全量推送，
+    # 不受 AI 闲聊过滤影响，QQ 官方推送时尝试 @全体成员
+    special_handles: frozenset[str]
 
 
 def _build_feeds() -> tuple[Feed, ...]:
@@ -204,4 +215,5 @@ def load_rss_config() -> RSSConfig:
         qq_official_appid=os.environ.get("QQ_OFFICIAL_APPID", "").strip(),
         qq_official_secret=os.environ.get("QQ_OFFICIAL_SECRET", "").strip(),
         qq_official_group_openid=os.environ.get("QQ_OFFICIAL_GROUP_OPENID", "").strip(),
+        special_handles=_parse_handles(os.environ.get("SPECIAL_HANDLES", "")),
     )

@@ -183,13 +183,8 @@ def _qq_official_access_token(appid: str, secret: str) -> str:
     return token
 
 
-def send_to_qq_official(appid: str, secret: str, group_openid: str, message: str) -> bool:
-    """通过官方 API 发群主动消息。成功返回 True，任何失败只记日志返回 False。"""
-    if not appid or not secret or not group_openid:
-        return False
-    token = _qq_official_access_token(appid, secret)
-    if not token:
-        return False
+def _qq_official_post(group_openid: str, token: str, payload: dict) -> bool:
+    """向官方 API 发一条群消息（payload 已组装好）。成功返回 True。"""
     try:
         resp = requests.post(
             f"https://api.sgroup.qq.com/v2/groups/{group_openid}/messages",
@@ -197,7 +192,7 @@ def send_to_qq_official(appid: str, secret: str, group_openid: str, message: str
                 "Authorization": f"QQBot {token}",
                 "Content-Type": "application/json",
             },
-            json={"content": message, "msg_type": 0},
+            json=payload,
             timeout=HTTP_TIMEOUT,
         )
     except requests.RequestException as exc:
@@ -210,6 +205,42 @@ def send_to_qq_official(appid: str, secret: str, group_openid: str, message: str
         _qq_official_token_cache["expires_at"] = 0.0
         return False
     return True
+
+
+def send_to_qq_official(
+    appid: str,
+    secret: str,
+    group_openid: str,
+    message: str,
+    at_everyone: bool = False,
+) -> bool:
+    """通过官方 API 发群主动消息。成功返回 True，任何失败只记日志返回 False。
+
+    at_everyone=True 时先尝试带 <qqbot-at-everyone /> 的 markdown 消息；
+    平台实测该标记能被识别，但 @全体成员需要机器人在群内有管理员权限，
+    无权限时接口返回 400——此时降级为普通文本重发，保证消息不丢失，
+    待机器人获得管理员权限后 @全体成员即自动生效。
+    """
+    if not appid or not secret or not group_openid:
+        return False
+    token = _qq_official_access_token(appid, secret)
+    if not token:
+        return False
+    if at_everyone:
+        payload = {
+            "msg_type": 2,
+            "markdown": {"content": "<qqbot-at-everyone />\n" + message},
+        }
+        if _qq_official_post(group_openid, token, payload):
+            return True
+        logger.warning(
+            "QQ 官方 @全体成员 发送未成功，降级为普通文本重发（机器人可能缺管理员权限）。"
+        )
+        # 降级重发前重取 token（失败路径已清缓存）
+        token = _qq_official_access_token(appid, secret)
+        if not token:
+            return False
+    return _qq_official_post(group_openid, token, {"content": message, "msg_type": 0})
 
 
 def _pin_message(bot_token: str, chat_id: str, message_id: int) -> None:

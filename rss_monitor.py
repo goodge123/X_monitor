@@ -34,6 +34,18 @@ MAX_NEW_PER_POLL = 5  # 单个 feed 每轮最多推送数，避免首次或积�
 # 部分实例（如 xcancel）会检查请求头，仅对“RSS 客户端”返回内容，
 # 浏览器 UA 反而被拒（400: This URL only works inside an RSS client）。
 # 因此使用 RSS 阅读器风格的 UA，并声明接受 RSS/XML。
+_USER_PATH_RE = re.compile(r"/twitter/user/([^/?#]+)")
+
+
+def _feed_handle(urls: tuple[str, ...]) -> str:
+    """从 feed URL 解析 X 用户名（小写），解析不到返回空串。"""
+    for u in urls:
+        m = _USER_PATH_RE.search(u or "")
+        if m:
+            return m.group(1).lower()
+    return ""
+
+
 USER_AGENT = "FreshRSS/1.24 (Linux; https://freshrss.org)"
 FEED_HEADERS = {
     "User-Agent": USER_AGENT,
@@ -265,6 +277,9 @@ def poll_feed(
     if not entries:
         return
 
+    # 特殊监控账号：全量推送（绕过闲聊过滤），QQ 官方推送尝试 @全体成员
+    is_special = _feed_handle(urls) in cfg.special_handles
+
     last_seen = state.get(state_key)
 
     # feedparser 通常按从新到旧排列；收集 last_seen 之前的新条目
@@ -290,8 +305,9 @@ def poll_feed(
         eid = entry_id(entry)
         summary = clean_text(entry.get("summary") or entry.get("title", ""))
         tag = classify_tweet(cfg, summary)
-        # AI 开启时只推项目相关，闲聊直接跳过（仍更新基线避免重复）
-        if tag == "[闲聊]" and cfg.ai_filter_idle:
+        # AI 开启时只推项目相关，闲聊直接跳过（仍更新基线避免重复）；
+        # 特殊监控账号不受此过滤，每条新帖都推
+        if tag == "[闲聊]" and cfg.ai_filter_idle and not is_special:
             logger.info("跳过闲聊 %s：%s", display_name, eid)
             state[state_key] = eid
             notifier.save_state(cfg.state_file, state)
@@ -316,6 +332,7 @@ def poll_feed(
                 cfg.qq_official_secret,
                 cfg.qq_official_group_openid,
                 message,
+                at_everyone=is_special,
             )
         state[state_key] = eid
         notifier.save_state(cfg.state_file, state)
